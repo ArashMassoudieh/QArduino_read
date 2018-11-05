@@ -7,7 +7,7 @@
 QT       += core gui
 INCLUDEPATH += ./serial/include
 
-greaterThan(QT_MAJOR_VERSION, 4): QT += widgets
+greaterThan(QT_MAJOR_VERSION, 4): QT += widgets charts sql
 
 TARGET = QArduino_Read
 TEMPLATE = app
@@ -30,10 +30,12 @@ SOURCES += \
         mainwindow.cpp \
     serial/src/serial.cc \
     serial/src/impl/unix.cc \
-    serial/src/impl/list_ports/list_ports_linux.cc
+    serial/src/impl/list_ports/list_ports_linux.cc \
+    connectmysql.cpp
 
 HEADERS += \
-        mainwindow.h
+        mainwindow.h \
+    connectmysql.h
 
 FORMS += \
         mainwindow.ui

@@ -6,6 +6,8 @@
 #include <qdebug.h>
 #include <qtimer.h>
 #include <qstringlist.h>
+#include <qdatetime.h>
+#include <qsqlquery.h>
 // OS Specific sleep
 #ifdef _WIN32
 #include <windows.h>
@@ -40,8 +42,8 @@ void enumerate_ports()
     {
         serial::PortInfo device = *iter++;
 
-        printf( "(%s, %s, %s)\n", device.port.c_str(), device.description.c_str(),
-     device.hardware_id.c_str() );
+        printf( "(%s, %s, %s)\n", device.port.c_str(), device.description.c_str(), device.hardware_id.c_str() );
+        qDebug()<<device.port.c_str()<< device.description.c_str()<<device.hardware_id.c_str();
     }
 }
 
@@ -169,6 +171,25 @@ MainWindow::MainWindow(QWidget *parent) :
     timer = new QTimer(this);
     connect(timer, SIGNAL(timeout()), this, SLOT(update()));
     timer->start(1000);
+    series = new QLineSeries();
+
+    chart = new QChart();
+    chart->addSeries(series);
+    chart->createDefaultAxes();
+    chart->setTitle("Light Intensity");
+    chart->legend()->hide();
+    _max = qreal(QDateTime::currentDateTime().toSecsSinceEpoch()/86400.0+1.0/24.0/60.0);
+    _min = qreal(QDateTime::currentDateTime().toSecsSinceEpoch()/86400.0);
+    chart->axisX()->setMin(_min);
+    chart->axisX()->setMax(_max);
+    chart->axisY()->setMax(300);
+    chartView = new QChartView(chart);
+    chartView->setRenderHint(QPainter::Antialiasing);
+    chartView->setChart(chart);
+    ui->horizontalLayout_6->addWidget(chartView);
+
+
+
 }
 
 MainWindow::~MainWindow()
@@ -184,17 +205,69 @@ void MainWindow::update()
         string port = "/dev/ttyACM0";
         unsigned long baud = 0;
         serial::Serial my_serial(port, baud, serial::Timeout::simpleTimeout(1000));
-        QString result = QString::fromStdString(my_serial.read(100));
-
-        QStringList results = result.split("\r")[0].split(",");
-        qDebug()<<result<<endl;
-        if (result.trimmed()!="" && results.size()>=4)
-        {   ui->Value1->setText(results[0]);
-            ui->Value2->setText(results[1]);
-            ui->Value3->setText(results[2]);
-            ui->Value4->setText(results[3]);
+        QString result = QString::fromStdString(my_serial.read(1000));
+        qDebug()<<result;
+        QStringList resultssplitbycrtn = result.split(QRegExp("\r\n"));
+        QStringList results;
+        if (resultssplitbycrtn.size()>2)
+        {   results = resultssplitbycrtn[resultssplitbycrtn.size()-2].split(",");
+            qDebug()<<"Long string: "<<resultssplitbycrtn[resultssplitbycrtn.size()-1];
         }
-        usleep(200);
+        QSqlQuery qry;
+        for (int i = 0; i<results.size(); i++)
+        {   QString str = results[i].trimmed();
+            qDebug()<<str;
+            QDateTime _time = QDateTime::currentDateTime();
+            if (str.contains("Light1"))
+            {
+                double value = str.right(str.size()-QString("Light1 = ").size()).trimmed().toFloat();
+                ui->Value1->setText(QString::number(value));
+                qreal t = qreal(_time.toSecsSinceEpoch()/86400.0);
+                series->append(t,qreal(str.right(str.size()-QString("Light1 = ").size()).trimmed().toInt()));
+                if (t>_max)
+                {   _max = qreal(QDateTime::currentDateTime().toSecsSinceEpoch()/86400.0+1.0/24.0/60.0);
+                    _min = qreal(QDateTime::currentDateTime().toSecsSinceEpoch()/86400.0-1.0/24.0/60.0);
+                    chart->axisX()->setMin(_min);
+                    chart->axisX()->setMax(_max);
+                    QString sql = "INSERT INTO `BioRetentionData`.`SensorData` (`Time`, `Value`, `Sensor`) VALUES ('" + _time.toString("yyyy/MM/dd hh:mm:ss") + "', '" + value + "', 'Light1')";
+                    qry.prepare(sql);
+                    qry.exec();
+                }
+
+                chart->update();
+                chartView->update();
+                qDebug()<<QDateTime::currentDateTime().toSecsSinceEpoch()/86400.00;
+            }
+            if (str.contains("Light2"))
+            {   double value = str.right(str.size()-QString("Light2 = ").size()).trimmed().toFloat();
+                ui->Value2->setText(QString::number(value));
+                QDateTime _time = QDateTime::currentDateTime();
+                QString sql = "INSERT INTO `BioRetentionData`.`SensorData` (`Time`, `Value`, `Sensor`) VALUES ('" + _time.toString("yyyy/MM/dd hh:mm:ss") + "', '" + value + "', 'Light2')";
+                qry.prepare(sql);
+                if (!qry.exec())
+                    qDebug()<<qry.lastError();
+            }
+            if (str.contains("Light3"))
+            {
+                double value = str.right(str.size()-QString("Light3 = ").size()).trimmed().toFloat();
+                ui->Value3->setText(QString::number(value));
+                QDateTime _time = QDateTime::currentDateTime();
+                QString sql = "INSERT INTO `BioRetentionData`.`SensorData` (`Time`, `Value`, `Sensor`) VALUES ('" + _time.toString("yyyy/MM/dd hh:mm:ss") + "', '" + value + "', 'Light3')";
+                qry.prepare(sql);
+                qry.exec();
+
+            }
+            if (str.contains("Light4"))
+            {   double value = str.right(str.size()-QString("Light4 = ").size()).trimmed().toFloat();
+                ui->Value4->setText(QString::number(value));
+                QDateTime _time = QDateTime::currentDateTime();
+                QString sql = "INSERT INTO `BioRetentionData`.`SensorData` (`Time`, `Value`, `Sensor`) VALUES ('" + _time.toString("yyyy/MM/dd hh:mm:ss") + "', '" + value + "', 'Light4')";
+                qry.prepare(sql);
+                qry.exec();
+            }
+            ui->lblTime->setText(_time.toString("yyyy.MM.dd, hh:mm:ss"));
+        }
+
         QCoreApplication::processEvents();
 
     }
@@ -203,6 +276,7 @@ void MainWindow::update()
 
 void MainWindow::on_recieve_data_clicked()
 {
+    enumerate_ports();
     string str;
     enumerate_ports();
     if (!recieving_data)
