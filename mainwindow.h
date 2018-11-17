@@ -2,11 +2,8 @@
 #define MAINWINDOW_H
 
 #include <QMainWindow>
-#include <QtCharts/QChartView>
-#include <QtCharts/QLineSeries>
 #include "connectmysql.h"
-
-QT_CHARTS_USE_NAMESPACE
+#include "qcustomplot.h"
 
 namespace Ui {
 class MainWindow;
@@ -24,11 +21,13 @@ private:
     Ui::MainWindow *ui;
     bool recieving_data = false;
     QTimer *timer;
-    QChart *chart;
-    QChartView *chartView;
-    QLineSeries *series;
+    QCustomPlot* plot;
     qreal _max, _min;
     connectmysql dbconnect;
+    void setupplot(QCustomPlot *customPlot);
+    QTimer dataTimer;
+    QCPItemTracer *itemDemoPhaseTracer;
+    QVector<QCPGraphData> timeData;
 private slots:
     void on_recieve_data_clicked();
     void update();

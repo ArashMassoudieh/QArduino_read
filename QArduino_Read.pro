@@ -6,8 +6,9 @@
 
 QT       += core gui
 INCLUDEPATH += ./serial/include
+INCLUDEPATH += ./qcustomplot/
 
-greaterThan(QT_MAJOR_VERSION, 4): QT += widgets charts sql
+greaterThan(QT_MAJOR_VERSION, 4): QT += widgets charts sql printsupport
 
 TARGET = QArduino_Read
 TEMPLATE = app
@@ -31,11 +32,13 @@ SOURCES += \
     serial/src/serial.cc \
     serial/src/impl/unix.cc \
     serial/src/impl/list_ports/list_ports_linux.cc \
-    connectmysql.cpp
+    connectmysql.cpp \
+    qcustomplot/qcustomplot.cpp
 
 HEADERS += \
         mainwindow.h \
-    connectmysql.h
+    connectmysql.h \
+    qcustomplot/qcustomplot.h
 
 FORMS += \
         mainwindow.ui

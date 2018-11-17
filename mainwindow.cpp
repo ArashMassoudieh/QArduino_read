@@ -8,6 +8,11 @@
 #include <qstringlist.h>
 #include <qdatetime.h>
 #include <qsqlquery.h>
+#include <QDebug>
+#include <QDesktopWidget>
+#include <QScreen>
+#include <QMessageBox>
+#include <QMetaEnum>
 // OS Specific sleep
 #ifdef _WIN32
 #include <windows.h>
@@ -171,22 +176,12 @@ MainWindow::MainWindow(QWidget *parent) :
     timer = new QTimer(this);
     connect(timer, SIGNAL(timeout()), this, SLOT(update()));
     timer->start(1000);
-    series = new QLineSeries();
+    plot = new QCustomPlot();
 
-    chart = new QChart();
-    chart->addSeries(series);
-    chart->createDefaultAxes();
-    chart->setTitle("Light Intensity");
-    chart->legend()->hide();
     _max = qreal(QDateTime::currentDateTime().toSecsSinceEpoch()/86400.0+1.0/24.0/60.0);
     _min = qreal(QDateTime::currentDateTime().toSecsSinceEpoch()/86400.0);
-    chart->axisX()->setMin(_min);
-    chart->axisX()->setMax(_max);
-    chart->axisY()->setMax(300);
-    chartView = new QChartView(chart);
-    chartView->setRenderHint(QPainter::Antialiasing);
-    chartView->setChart(chart);
-    ui->horizontalLayout_6->addWidget(chartView);
+
+    ui->horizontalLayout_6->addWidget(plot);
 
 
 
@@ -223,19 +218,21 @@ void MainWindow::update()
                 double value = str.right(str.size()-QString("Light1 = ").size()).trimmed().toFloat();
                 ui->Value1->setText(QString::number(value));
                 qreal t = qreal(_time.toSecsSinceEpoch()/86400.0);
-                series->append(t,qreal(str.right(str.size()-QString("Light1 = ").size()).trimmed().toInt()));
+
+                QCPGraphData datapoint;
+                datapoint.key = t;
+                datapoint.value = 1;
+                timeData.append(datapoint);
                 if (t>_max)
                 {   _max = qreal(QDateTime::currentDateTime().toSecsSinceEpoch()/86400.0+1.0/24.0/60.0);
                     _min = qreal(QDateTime::currentDateTime().toSecsSinceEpoch()/86400.0-1.0/24.0/60.0);
-                    chart->axisX()->setMin(_min);
-                    chart->axisX()->setMax(_max);
+                    plot->xAxis->setRange(_min, _max);
                     QString sql = "INSERT INTO `BioRetentionData`.`SensorData` (`Time`, `Value`, `Sensor`) VALUES ('" + _time.toString("yyyy/MM/dd hh:mm:ss") + "', '" + value + "', 'Light1')";
                     qry.prepare(sql);
                     qry.exec();
                 }
 
-                chart->update();
-                chartView->update();
+
                 qDebug()<<QDateTime::currentDateTime().toSecsSinceEpoch()/86400.00;
             }
             if (str.contains("Light2"))
@@ -288,4 +285,59 @@ void MainWindow::on_recieve_data_clicked()
     {   recieving_data = false;
         ui->pushButton->setText("Start");
     }
+}
+
+void MainWindow::setupplot(QCustomPlot *customPlot)
+{
+
+  // set locale to english, so we get english month names:
+  customPlot->setLocale(QLocale(QLocale::English, QLocale::UnitedStates));
+  // seconds of current time, we'll use it as starting point in time for data:
+  double now = QDateTime::currentDateTime().toTime_t();
+  srand(8); // set the random seed, so we always get the same random data
+  // create multiple graphs:
+
+   int gi = 1;
+   customPlot->addGraph();
+   QColor color(20+200/4.0*1,70*(1.6-gi/4.0), 150, 150);
+   customPlot->graph()->setLineStyle(QCPGraph::lsLine);
+   customPlot->graph()->setPen(QPen(color.lighter(200)));
+   customPlot->graph()->setBrush(QBrush(color));
+    // generate random walk data:
+
+    QCPGraphData datapoint;
+    datapoint.key = now;
+    datapoint.value = 1;
+    timeData.append(datapoint);
+
+    customPlot->graph()->data()->set(timeData);
+
+  // configure bottom axis to show date instead of number:
+  QSharedPointer<QCPAxisTickerDateTime> dateTicker(new QCPAxisTickerDateTime);
+  dateTicker->setDateTimeFormat("d. MMMM\nyyyy");
+  plot->xAxis->setTicker(dateTicker);
+  // configure left axis text labels:
+  QSharedPointer<QCPAxisTickerText> textTicker(new QCPAxisTickerText);
+  textTicker->addTick(10, "a bit\nlow");
+  textTicker->addTick(50, "quite\nhigh");
+  plot->yAxis->setTicker(textTicker);
+  // set a more compact font size for bottom and left axis tick labels:
+  plot->xAxis->setTickLabelFont(QFont(QFont().family(), 8));
+  plot->yAxis->setTickLabelFont(QFont(QFont().family(), 8));
+  // set axis labels:
+  plot->xAxis->setLabel("Date");
+  plot->yAxis->setLabel("Random wobbly lines value");
+  // make top and right axes visible but without ticks and labels:
+  plot->xAxis2->setVisible(true);
+  plot->yAxis2->setVisible(true);
+  plot->xAxis2->setTicks(false);
+  plot->yAxis2->setTicks(false);
+  plot->xAxis2->setTickLabels(false);
+  plot->yAxis2->setTickLabels(false);
+  // set axis ranges to show all data:
+  plot->xAxis->setRange(now, now+24*3600*249);
+  plot->yAxis->setRange(0, 60);
+  // show legend with slightly transparent background brush:
+  plot->legend->setVisible(true);
+  plot->legend->setBrush(QColor(255, 255, 255, 150));
 }
