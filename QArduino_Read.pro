@@ -8,7 +8,7 @@ QT       += core gui
 INCLUDEPATH += ./serial/include
 INCLUDEPATH += ./qcustomplot/
 
-greaterThan(QT_MAJOR_VERSION, 4): QT += widgets charts sql printsupport
+greaterThan(QT_MAJOR_VERSION, 4): QT += widgets sql printsupport
 
 TARGET = QArduino_Read
 TEMPLATE = app
