@@ -28,6 +28,7 @@ private:
     QTimer dataTimer;
     QCPItemTracer *itemDemoPhaseTracer;
     QVector<QCPGraphData> timeData;
+    bool ArduinoPresent = true;
 private slots:
     void on_recieve_data_clicked();
     void update();

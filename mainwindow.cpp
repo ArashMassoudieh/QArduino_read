@@ -37,8 +37,9 @@ void my_sleep(unsigned long milliseconds) {
 #endif
 }
 
-void enumerate_ports()
+bool enumerate_ports()
 {
+    bool res = false;
     vector<serial::PortInfo> devices_found = serial::list_ports();
 
     vector<serial::PortInfo>::iterator iter = devices_found.begin();
@@ -46,10 +47,11 @@ void enumerate_ports()
     while( iter != devices_found.end() )
     {
         serial::PortInfo device = *iter++;
-
+        if (device.port.c_str()=="/dev/ttyACM0") res = true;
         printf( "(%s, %s, %s)\n", device.port.c_str(), device.description.c_str(), device.hardware_id.c_str() );
         qDebug()<<device.port.c_str()<< device.description.c_str()<<device.hardware_id.c_str();
     }
+    return  res;
 }
 
 void print_usage()
@@ -171,16 +173,29 @@ MainWindow::MainWindow(QWidget *parent) :
     QMainWindow(parent),
     ui(new Ui::MainWindow)
 {
+
     ui->setupUi(this);
     connect(ui->pushButton,SIGNAL(clicked()),this,SLOT(on_recieve_data_clicked()));
     timer = new QTimer(this);
     connect(timer, SIGNAL(timeout()), this, SLOT(update()));
     timer->start(1000);
     plot = new QCustomPlot();
-
-    _max = qreal(QDateTime::currentDateTime().toSecsSinceEpoch()/86400.0+1.0/24.0/60.0);
-    _min = qreal(QDateTime::currentDateTime().toSecsSinceEpoch()/86400.0);
-
+    if (!enumerate_ports())
+    {
+        ui->pushButton->setEnabled(false);
+        ui->pushButton->setText("Arduino is not connected!");
+        ArduinoPresent = false;
+    }
+    else ArduinoPresent = true;
+    _max = qreal(QDateTime::currentDateTime().toTime_t()+3600);
+    _min = qreal(QDateTime::currentDateTime().toTime_t());
+    plot->addGraph();
+    plot->xAxis->setRange(_min, _max);
+    QSharedPointer<QCPAxisTickerDateTime> dateTicker(new QCPAxisTickerDateTime);
+    dateTicker->setDateTimeFormat("MM/dd, hh:mm");
+    plot->xAxis->setTicker(dateTicker);
+    plot->update();
+    plot->replot();
     ui->horizontalLayout_6->addWidget(plot);
 
 
@@ -217,15 +232,16 @@ void MainWindow::update()
             {
                 double value = str.right(str.size()-QString("Light1 = ").size()).trimmed().toFloat();
                 ui->Value1->setText(QString::number(value));
-                qreal t = qreal(_time.toSecsSinceEpoch()/86400.0);
+                qreal t = qreal(_time.toMSecsSinceEpoch()/86400000.0);
 
                 QCPGraphData datapoint;
                 datapoint.key = t;
                 datapoint.value = 1;
+                plot->graph(0)->addData(datapoint.key,datapoint.value);
                 timeData.append(datapoint);
                 if (t>_max)
-                {   _max = qreal(QDateTime::currentDateTime().toSecsSinceEpoch()/86400.0+1.0/24.0/60.0);
-                    _min = qreal(QDateTime::currentDateTime().toSecsSinceEpoch()/86400.0-1.0/24.0/60.0);
+                {   _max = qreal(QDateTime::currentDateTime().toTime_t()+1800);
+                    _min = qreal(QDateTime::currentDateTime().toTime_t()-1800);
                     plot->xAxis->setRange(_min, _max);
                     QString sql = "INSERT INTO `BioRetentionData`.`SensorData` (`Time`, `Value`, `Sensor`) VALUES ('" + _time.toString("yyyy/MM/dd hh:mm:ss") + "', '" + value + "', 'Light1')";
                     qry.prepare(sql);
@@ -233,7 +249,7 @@ void MainWindow::update()
                 }
 
 
-                qDebug()<<QDateTime::currentDateTime().toSecsSinceEpoch()/86400.00;
+                qDebug()<<QDateTime::currentDateTime().toMSecsSinceEpoch()/86400000.00;
             }
             if (str.contains("Light2"))
             {   double value = str.right(str.size()-QString("Light2 = ").size()).trimmed().toFloat();
@@ -268,6 +284,27 @@ void MainWindow::update()
         QCoreApplication::processEvents();
 
     }
+    if (!ArduinoPresent)
+    {
+        QDateTime _time = QDateTime::currentDateTime();
+
+        double value = double(random())/double(RAND_MAX);
+        ui->Value1->setText(QString::number(value));
+        qreal t = qreal(_time.toMSecsSinceEpoch()/86400000.0);
+
+        QCPGraphData datapoint;
+        datapoint.key = _time.toTime_t();
+        datapoint.value = value;
+        plot->graph(0)->addData(datapoint.key,datapoint.value);
+        if (t>_max)
+        {   _max = qreal(QDateTime::currentDateTime().toTime_t()+1800);
+            _min = qreal(QDateTime::currentDateTime().toTime_t()-1800);
+            plot->xAxis->setRange(_min, _max);
+        }
+        qDebug()<<_time.toTime_t()<<","<<t<<","<<_min<<","<<_max<<value;
+
+    }
+    plot->replot();
 
 }
 
@@ -275,7 +312,6 @@ void MainWindow::on_recieve_data_clicked()
 {
     enumerate_ports();
     string str;
-    enumerate_ports();
     if (!recieving_data)
     {   recieving_data = true;
         ui->pushButton->setText("Stop");
