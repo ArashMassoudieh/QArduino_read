@@ -5,7 +5,7 @@
 #-------------------------------------------------
 
 QT       += core gui
-INCLUDEPATH += ./serial/include
+INCLUDEPATH += ./Serial/include
 INCLUDEPATH += ./qcustomplot/
 
 greaterThan(QT_MAJOR_VERSION, 4): QT += widgets sql printsupport
@@ -29,9 +29,9 @@ CONFIG += c++14
 SOURCES += \
         main.cpp \
         mainwindow.cpp \
-    serial/src/serial.cc \
-    serial/src/impl/unix.cc \
-    serial/src/impl/list_ports/list_ports_linux.cc \
+    Serial/src/serial.cc \
+    Serial/src/impl/unix.cc \
+    Serial/src/impl/list_ports/list_ports_linux.cc \
     connectmysql.cpp \
     qcustomplot/qcustomplot.cpp
 

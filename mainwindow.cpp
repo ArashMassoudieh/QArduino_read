@@ -246,6 +246,7 @@ MainWindow::MainWindow(QWidget *parent) :
         QSharedPointer<QCPAxisTickerDateTime> dateTicker(new QCPAxisTickerDateTime);
         dateTicker->setDateTimeFormat("MM/dd, hh:mm");
         plots[i]->xAxis->setTicker(dateTicker);
+        plots[i]->yAxis->setLabel(dataseriesinfo[i].QuantityName);
         plots[i]->update();
         plots[i]->replot();
         ui->verticalLayout_3->addWidget(plots[i]);
