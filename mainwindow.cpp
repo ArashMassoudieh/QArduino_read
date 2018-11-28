@@ -225,15 +225,18 @@ MainWindow::MainWindow(QWidget *parent) :
         sizePolicy1.setVerticalStretch(0);
         sizePolicy1.setHeightForWidth(Labels[i]->sizePolicy().hasHeightForWidth());
         Labels[i]->setSizePolicy(sizePolicy1);
-        Labels[i]->setText(dataseriesinfo[i].QuantityName);
+        Labels[i]->setText(dataseriesinfo[i].QuantityName + ": ");
         horizontalLayouts[i]->addWidget(Labels[i]);
 
         Values[i] = new QLabel(ui->centralWidget);
-        Values[i]->setObjectName(QStringLiteral("lblTime"));
+
         sizePolicy1.setHeightForWidth(Values[i]->sizePolicy().hasHeightForWidth());
         Values[i]->setSizePolicy(sizePolicy1);
 
         horizontalLayouts[i]->addWidget(Values[i]);
+        QSpacerItem *horizontalSpacer = new QSpacerItem(40, 20, QSizePolicy::Expanding, QSizePolicy::Minimum);
+
+        horizontalLayouts[i]->addItem(horizontalSpacer);
         ui->verticalLayout_4->addLayout(horizontalLayouts[i]);
 
 
