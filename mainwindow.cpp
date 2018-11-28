@@ -13,6 +13,8 @@
 #include <QScreen>
 #include <QMessageBox>
 #include <QMetaEnum>
+#include <math.h>
+#include <algorithm>
 // OS Specific sleep
 #ifdef _WIN32
 #include <windows.h>
@@ -28,6 +30,8 @@ using std::cout;
 using std::cerr;
 using std::endl;
 using std::vector;
+
+
 
 void my_sleep(unsigned long milliseconds) {
 #ifdef _WIN32
@@ -47,7 +51,8 @@ bool enumerate_ports()
     while( iter != devices_found.end() )
     {
         serial::PortInfo device = *iter++;
-        if (device.port.c_str()=="/dev/ttyACM0") res = true;
+        string arduino_port = "/dev/ttyACM0";
+        if (device.port.c_str()==arduino_port) res = true;
         printf( "(%s, %s, %s)\n", device.port.c_str(), device.description.c_str(), device.hardware_id.c_str() );
         qDebug()<<device.port.c_str()<< device.description.c_str()<<device.hardware_id.c_str();
     }
@@ -179,7 +184,13 @@ MainWindow::MainWindow(QWidget *parent) :
     timer = new QTimer(this);
     connect(timer, SIGNAL(timeout()), this, SLOT(update()));
     timer->start(1000);
-    plot = new QCustomPlot();
+
+    horizontalLayouts.resize(numdataseries);
+    Labels.resize(numdataseries);
+    Values.resize(numdataseries);
+
+
+
     if (!enumerate_ports())
     {
         ui->pushButton->setEnabled(false);
@@ -189,14 +200,56 @@ MainWindow::MainWindow(QWidget *parent) :
     else ArduinoPresent = true;
     _max = qreal(QDateTime::currentDateTime().toTime_t()+3600);
     _min = qreal(QDateTime::currentDateTime().toTime_t());
-    plot->addGraph();
-    plot->xAxis->setRange(_min, _max);
-    QSharedPointer<QCPAxisTickerDateTime> dateTicker(new QCPAxisTickerDateTime);
-    dateTicker->setDateTimeFormat("MM/dd, hh:mm");
-    plot->xAxis->setTicker(dateTicker);
-    plot->update();
-    plot->replot();
-    ui->horizontalLayout_6->addWidget(plot);
+    dataseriesinfo.resize(numdataseries);
+    dataseriesinfo[0].ArduinoKeyword = "Light1";
+    dataseriesinfo[1].ArduinoKeyword = "Light2";
+    dataseriesinfo[2].ArduinoKeyword = "Light3";
+    dataseriesinfo[3].ArduinoKeyword = "Light4";
+    dataseriesinfo[0].QuantityName = "Light1";
+    dataseriesinfo[1].QuantityName = "Light2";
+    dataseriesinfo[2].QuantityName = "Light3";
+    dataseriesinfo[3].QuantityName = "Light4";
+
+
+
+    for (int i=0; i<numdataseries; i++)
+    {
+        horizontalLayouts[i] = new QHBoxLayout();
+        horizontalLayouts[i]->setSpacing(6);
+        horizontalLayouts[i]->setObjectName(QStringLiteral("horizontalLayout_5"));
+        horizontalLayouts[i]->setSizeConstraint(QLayout::SetFixedSize);
+        Labels[i] = new QLabel(ui->centralWidget);
+        //label->setObjectName(QStringLiteral("label"));
+        QSizePolicy sizePolicy1(QSizePolicy::Preferred, QSizePolicy::Minimum);
+        sizePolicy1.setHorizontalStretch(0);
+        sizePolicy1.setVerticalStretch(0);
+        sizePolicy1.setHeightForWidth(Labels[i]->sizePolicy().hasHeightForWidth());
+        Labels[i]->setSizePolicy(sizePolicy1);
+        Labels[i]->setText(dataseriesinfo[i].QuantityName);
+        horizontalLayouts[i]->addWidget(Labels[i]);
+
+        Values[i] = new QLabel(ui->centralWidget);
+        Values[i]->setObjectName(QStringLiteral("lblTime"));
+        sizePolicy1.setHeightForWidth(Values[i]->sizePolicy().hasHeightForWidth());
+        Values[i]->setSizePolicy(sizePolicy1);
+
+        horizontalLayouts[i]->addWidget(Values[i]);
+        ui->verticalLayout_4->addLayout(horizontalLayouts[i]);
+
+
+    }
+    plots.resize(numdataseries);
+    for (int i = 0; i<numdataseries; i++)
+    {   plots[i] = new QCustomPlot();
+        plots[i]->addGraph();
+        plots[i]->xAxis->setRange(_min, _max);
+        QSharedPointer<QCPAxisTickerDateTime> dateTicker(new QCPAxisTickerDateTime);
+        dateTicker->setDateTimeFormat("MM/dd, hh:mm");
+        plots[i]->xAxis->setTicker(dateTicker);
+        plots[i]->update();
+        plots[i]->replot();
+        ui->verticalLayout_3->addWidget(plots[i]);
+    }
 
 
 
@@ -210,6 +263,7 @@ MainWindow::~MainWindow()
 
 void MainWindow::update()
 {
+
     if (recieving_data)
     {
         string port = "/dev/ttyACM0";
@@ -224,61 +278,39 @@ void MainWindow::update()
             qDebug()<<"Long string: "<<resultssplitbycrtn[resultssplitbycrtn.size()-1];
         }
         QSqlQuery qry;
-        for (int i = 0; i<results.size(); i++)
-        {   QString str = results[i].trimmed();
-            qDebug()<<str;
-            QDateTime _time = QDateTime::currentDateTime();
-            if (str.contains("Light1"))
-            {
-                double value = str.right(str.size()-QString("Light1 = ").size()).trimmed().toFloat();
-                ui->Value1->setText(QString::number(value));
-                qreal t = qreal(_time.toMSecsSinceEpoch()/86400000.0);
+        for (int j=0; j<numdataseries; j++)
+        {   for (int i = 0; i<results.size(); i++)
+            {   QString str = results[i].trimmed();
+                qDebug()<<str;
+                QDateTime _time = QDateTime::currentDateTime();
+                if (str.contains(dataseriesinfo[j].ArduinoKeyword))
+                {
+                    double value = str.right(str.size()-QString(dataseriesinfo[j].ArduinoKeyword + "= ").size()).trimmed().toFloat();
+                    Values[j]->setText(QString::number(value));
+                    qreal t = qreal(_time.toMSecsSinceEpoch()/86400000.0);
+                    dataseriesinfo[j].max_val = std::max(value,dataseriesinfo[j].max_val);
+                    QCPGraphData datapoint;
+                    datapoint.key = _time.toTime_t();
+                    datapoint.value = value;
+                    plots[j]->graph(0)->addData(datapoint.key,datapoint.value);
 
-                QCPGraphData datapoint;
-                datapoint.key = t;
-                datapoint.value = 1;
-                plot->graph(0)->addData(datapoint.key,datapoint.value);
-                timeData.append(datapoint);
-                if (t>_max)
-                {   _max = qreal(QDateTime::currentDateTime().toTime_t()+1800);
-                    _min = qreal(QDateTime::currentDateTime().toTime_t()-1800);
-                    plot->xAxis->setRange(_min, _max);
                     QString sql = "INSERT INTO `BioRetentionData`.`SensorData` (`Time`, `Value`, `Sensor`) VALUES ('" + _time.toString("yyyy/MM/dd hh:mm:ss") + "', '" + value + "', 'Light1')";
                     qry.prepare(sql);
                     qry.exec();
+                    plots[j]->yAxis->setRange(0, dataseriesinfo[j].max_val*1.1);
+                    if (t>_max)
+                    {   _max = qreal(QDateTime::currentDateTime().toTime_t()+1800);
+                        _min = qreal(QDateTime::currentDateTime().toTime_t()-1800);
+                        plots[j]->xAxis->setRange(_min, _max);
+
+                    }
+
+
+                    qDebug()<<QDateTime::currentDateTime().toMSecsSinceEpoch()/86400000.00;
                 }
 
-
-                qDebug()<<QDateTime::currentDateTime().toMSecsSinceEpoch()/86400000.00;
+                ui->lblTime->setText(_time.toString("yyyy.MM.dd, hh:mm:ss"));
             }
-            if (str.contains("Light2"))
-            {   double value = str.right(str.size()-QString("Light2 = ").size()).trimmed().toFloat();
-                ui->Value2->setText(QString::number(value));
-                QDateTime _time = QDateTime::currentDateTime();
-                QString sql = "INSERT INTO `BioRetentionData`.`SensorData` (`Time`, `Value`, `Sensor`) VALUES ('" + _time.toString("yyyy/MM/dd hh:mm:ss") + "', '" + value + "', 'Light2')";
-                qry.prepare(sql);
-                if (!qry.exec())
-                    qDebug()<<qry.lastError();
-            }
-            if (str.contains("Light3"))
-            {
-                double value = str.right(str.size()-QString("Light3 = ").size()).trimmed().toFloat();
-                ui->Value3->setText(QString::number(value));
-                QDateTime _time = QDateTime::currentDateTime();
-                QString sql = "INSERT INTO `BioRetentionData`.`SensorData` (`Time`, `Value`, `Sensor`) VALUES ('" + _time.toString("yyyy/MM/dd hh:mm:ss") + "', '" + value + "', 'Light3')";
-                qry.prepare(sql);
-                qry.exec();
-
-            }
-            if (str.contains("Light4"))
-            {   double value = str.right(str.size()-QString("Light4 = ").size()).trimmed().toFloat();
-                ui->Value4->setText(QString::number(value));
-                QDateTime _time = QDateTime::currentDateTime();
-                QString sql = "INSERT INTO `BioRetentionData`.`SensorData` (`Time`, `Value`, `Sensor`) VALUES ('" + _time.toString("yyyy/MM/dd hh:mm:ss") + "', '" + value + "', 'Light4')";
-                qry.prepare(sql);
-                qry.exec();
-            }
-            ui->lblTime->setText(_time.toString("yyyy.MM.dd, hh:mm:ss"));
         }
 
         QCoreApplication::processEvents();
@@ -289,22 +321,23 @@ void MainWindow::update()
         QDateTime _time = QDateTime::currentDateTime();
 
         double value = double(random())/double(RAND_MAX);
-        ui->Value1->setText(QString::number(value));
+        Values[0]->setText(QString::number(value));
         qreal t = qreal(_time.toMSecsSinceEpoch()/86400000.0);
 
         QCPGraphData datapoint;
         datapoint.key = _time.toTime_t();
         datapoint.value = value;
-        plot->graph(0)->addData(datapoint.key,datapoint.value);
+        plots[0]->graph(0)->addData(datapoint.key,datapoint.value);
         if (t>_max)
         {   _max = qreal(QDateTime::currentDateTime().toTime_t()+1800);
             _min = qreal(QDateTime::currentDateTime().toTime_t()-1800);
-            plot->xAxis->setRange(_min, _max);
+            plots[0]->xAxis->setRange(_min, _max);
         }
         qDebug()<<_time.toTime_t()<<","<<t<<","<<_min<<","<<_max<<value;
 
     }
-    plot->replot();
+    for (int i=0; i<numdataseries; i++)
+        plots[i]->replot();
 
 }
 
@@ -351,29 +384,31 @@ void MainWindow::setupplot(QCustomPlot *customPlot)
   // configure bottom axis to show date instead of number:
   QSharedPointer<QCPAxisTickerDateTime> dateTicker(new QCPAxisTickerDateTime);
   dateTicker->setDateTimeFormat("d. MMMM\nyyyy");
-  plot->xAxis->setTicker(dateTicker);
-  // configure left axis text labels:
-  QSharedPointer<QCPAxisTickerText> textTicker(new QCPAxisTickerText);
-  textTicker->addTick(10, "a bit\nlow");
-  textTicker->addTick(50, "quite\nhigh");
-  plot->yAxis->setTicker(textTicker);
-  // set a more compact font size for bottom and left axis tick labels:
-  plot->xAxis->setTickLabelFont(QFont(QFont().family(), 8));
-  plot->yAxis->setTickLabelFont(QFont(QFont().family(), 8));
-  // set axis labels:
-  plot->xAxis->setLabel("Date");
-  plot->yAxis->setLabel("Random wobbly lines value");
-  // make top and right axes visible but without ticks and labels:
-  plot->xAxis2->setVisible(true);
-  plot->yAxis2->setVisible(true);
-  plot->xAxis2->setTicks(false);
-  plot->yAxis2->setTicks(false);
-  plot->xAxis2->setTickLabels(false);
-  plot->yAxis2->setTickLabels(false);
-  // set axis ranges to show all data:
-  plot->xAxis->setRange(now, now+24*3600*249);
-  plot->yAxis->setRange(0, 60);
-  // show legend with slightly transparent background brush:
-  plot->legend->setVisible(true);
-  plot->legend->setBrush(QColor(255, 255, 255, 150));
+  for (int i=0; i<numdataseries; i++)
+  {   plots[i]->xAxis->setTicker(dateTicker);
+      // configure left axis text labels:
+      QSharedPointer<QCPAxisTickerText> textTicker(new QCPAxisTickerText);
+      textTicker->addTick(10, "a bit\nlow");
+      textTicker->addTick(50, "quite\nhigh");
+      plots[i]->yAxis->setTicker(textTicker);
+      // set a more compact font size for bottom and left axis tick labels:
+      plots[i]->xAxis->setTickLabelFont(QFont(QFont().family(), 8));
+      plots[i]->yAxis->setTickLabelFont(QFont(QFont().family(), 8));
+      // set axis labels:
+      plots[i]->xAxis->setLabel("Date");
+      plots[i]->yAxis->setLabel("Random wobbly lines value");
+      // make top and right axes visible but without ticks and labels:
+      plots[i]->xAxis2->setVisible(true);
+      plots[i]->yAxis2->setVisible(true);
+      plots[i]->xAxis2->setTicks(false);
+      plots[i]->yAxis2->setTicks(false);
+      plots[i]->xAxis2->setTickLabels(false);
+      plots[i]->yAxis2->setTickLabels(false);
+      // set axis ranges to show all data:
+      plots[i]->xAxis->setRange(now, now+24*3600*249);
+      plots[i]->yAxis->setRange(0, 60);
+      // show legend with slightly transparent background brush:
+      plots[i]->legend->setVisible(true);
+      plots[i]->legend->setBrush(QColor(255, 255, 255, 150));
+  }
 }
