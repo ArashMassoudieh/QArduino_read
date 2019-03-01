@@ -22,7 +22,8 @@
 #include <unistd.h>
 #endif
 
-#include "serial/serial.h"
+
+#include "./Serial/include/serial/serial.h"
 
 using std::string;
 using std::exception;
@@ -183,7 +184,7 @@ MainWindow::MainWindow(QWidget *parent) :
     connect(ui->pushButton,SIGNAL(clicked()),this,SLOT(on_recieve_data_clicked()));
     timer = new QTimer(this);
     connect(timer, SIGNAL(timeout()), this, SLOT(update()));
-    timer->start(1000);
+    timer->start(10000);
 
     horizontalLayouts.resize(numdataseries);
     Labels.resize(numdataseries);
@@ -201,14 +202,14 @@ MainWindow::MainWindow(QWidget *parent) :
     _max = qreal(QDateTime::currentDateTime().toTime_t()+3600);
     _min = qreal(QDateTime::currentDateTime().toTime_t());
     dataseriesinfo.resize(numdataseries);
-    dataseriesinfo[0].ArduinoKeyword = "Light1";
-    dataseriesinfo[1].ArduinoKeyword = "Light2";
-    dataseriesinfo[2].ArduinoKeyword = "Light3";
-    dataseriesinfo[3].ArduinoKeyword = "Light4";
-    dataseriesinfo[0].QuantityName = "Light1";
-    dataseriesinfo[1].QuantityName = "Light2";
-    dataseriesinfo[2].QuantityName = "Light3";
-    dataseriesinfo[3].QuantityName = "Light4";
+    dataseriesinfo[0].ArduinoKeyword = "Light";
+    dataseriesinfo[1].ArduinoKeyword = "TempDHT";
+    dataseriesinfo[2].ArduinoKeyword = "HumidityDHT22";
+    dataseriesinfo[3].ArduinoKeyword = "Windspeed";
+    dataseriesinfo[0].QuantityName = "Light";
+    dataseriesinfo[1].QuantityName = "Temperature";
+    dataseriesinfo[2].QuantityName = "Humidity";
+    dataseriesinfo[3].QuantityName = "Wind Speed (m/s)";
 
 
 
@@ -298,9 +299,17 @@ void MainWindow::update()
                     datapoint.value = value;
                     plots[j]->graph(0)->addData(datapoint.key,datapoint.value);
 
-                    QString sql = "INSERT INTO `BioRetentionData`.`SensorData` (`Time`, `Value`, `Sensor`) VALUES ('" + _time.toString("yyyy/MM/dd hh:mm:ss") + "', '" + value + "', 'Light1')";
+                    QString sql = "INSERT INTO `BioRetentionData`.`SensorData` (`Time`, `Value`, `Sensor`) VALUES ('" + _time.toString("yyyy/MM/dd hh:mm:ss") + "', '" + QString::number(value) + "', '" + dataseriesinfo[j].ArduinoKeyword +"')";
                     qry.prepare(sql);
-                    qry.exec();
+                    bool success = qry.exec();
+                    if (!success)
+                    {   qDebug()<<"Transaction Unsuccessful!";
+                        qDebug()<<qry.lastError().text();
+                        qDebug()<<sql;
+                    }
+                    else
+                        qDebug()<<"Transaction Successful!";
+
                     plots[j]->yAxis->setRange(0, dataseriesinfo[j].max_val*1.1);
                     if (t>_max)
                     {   _max = qreal(QDateTime::currentDateTime().toTime_t()+1800);
