@@ -39,7 +39,7 @@ private:
     QVector<QCPGraphData> timeData;
     bool ArduinoPresent = true;
     QVector<_dataseriesinfo> dataseriesinfo;
-    int numdataseries = 4;
+    int numdataseries = 2;
 
     QVector<QHBoxLayout*> horizontalLayouts;
     QVector<QLabel*> Labels;

@@ -202,14 +202,14 @@ MainWindow::MainWindow(QWidget *parent) :
     _max = qreal(QDateTime::currentDateTime().toTime_t()+3600);
     _min = qreal(QDateTime::currentDateTime().toTime_t());
     dataseriesinfo.resize(numdataseries);
-    dataseriesinfo[0].ArduinoKeyword = "Light";
-    dataseriesinfo[1].ArduinoKeyword = "TempDHT";
-    dataseriesinfo[2].ArduinoKeyword = "HumidityDHT22";
-    dataseriesinfo[3].ArduinoKeyword = "Windspeed";
-    dataseriesinfo[0].QuantityName = "Light";
-    dataseriesinfo[1].QuantityName = "Temperature";
-    dataseriesinfo[2].QuantityName = "Humidity";
-    dataseriesinfo[3].QuantityName = "Wind Speed (m/s)";
+    dataseriesinfo[0].ArduinoKeyword = "distance";
+    dataseriesinfo[1].ArduinoKeyword = "intensity";
+    //dataseriesinfo[2].ArduinoKeyword = "HumidityDHT22";
+    //dataseriesinfo[3].ArduinoKeyword = "Windspeed";
+    dataseriesinfo[0].QuantityName = "distance";
+    dataseriesinfo[1].QuantityName = "intensity";
+    //dataseriesinfo[2].QuantityName = "Humidity";
+    //dataseriesinfo[3].QuantityName = "Wind Speed (m/s)";
 
 
 
@@ -271,6 +271,7 @@ void MainWindow::update()
 
     if (recieving_data)
     {
+        int added = 0;
         string port = "/dev/ttyACM0";
         unsigned long baud = 0;
         serial::Serial my_serial(port, baud, serial::Timeout::simpleTimeout(1000));
@@ -298,7 +299,7 @@ void MainWindow::update()
                     datapoint.key = _time.toTime_t();
                     datapoint.value = value;
                     plots[j]->graph(0)->addData(datapoint.key,datapoint.value);
-
+                    added ++;
                     QString sql = "INSERT INTO `BioRetentionData`.`SensorData` (`Time`, `Value`, `Sensor`) VALUES ('" + _time.toString("yyyy/MM/dd hh:mm:ss") + "', '" + QString::number(value) + "', '" + dataseriesinfo[j].ArduinoKeyword +"')";
                     qry.prepare(sql);
                     bool success = qry.exec();
@@ -315,7 +316,8 @@ void MainWindow::update()
                     {   _max = qreal(QDateTime::currentDateTime().toTime_t()+1800);
                         _min = qreal(QDateTime::currentDateTime().toTime_t()-1800);
                         plots[j]->xAxis->setRange(_min, _max);
-
+                        plots[j]->graph(0)->data()->remove(0,plots[j]->graph(0)->data()->size()-added);
+                        added = 0;
                     }
 
 
