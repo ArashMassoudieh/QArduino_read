@@ -15,6 +15,7 @@
 #include <QMetaEnum>
 #include <math.h>
 #include <algorithm>
+
 // OS Specific sleep
 #ifdef _WIN32
 #include <windows.h>
@@ -199,7 +200,8 @@ MainWindow::MainWindow(QWidget *parent) :
         ArduinoPresent = false;
     }
     else ArduinoPresent = true;
-    _max = qreal(QDateTime::currentDateTime().toTime_t()+3600);
+
+    _max = qreal(QDateTime::currentDateTime().toTime_t()+update_graph_interval);
     _min = qreal(QDateTime::currentDateTime().toTime_t());
     dataseriesinfo.resize(numdataseries);
     dataseriesinfo[0].ArduinoKeyword = "distance";
@@ -272,6 +274,7 @@ void MainWindow::update()
     if (recieving_data)
     {
         int added = 0;
+        int added_p = 0;
         string port = "/dev/ttyACM0";
         unsigned long baud = 0;
         serial::Serial my_serial(port, baud, serial::Timeout::simpleTimeout(1000));
@@ -284,21 +287,24 @@ void MainWindow::update()
             qDebug()<<"Long string: "<<resultssplitbycrtn[resultssplitbycrtn.size()-1];
         }
         QSqlQuery qry;
+        QDateTime _time = QDateTime::currentDateTime();
+        qreal t = qreal(_time.toMSecsSinceEpoch()/86400000.0);
+        qreal t1 = qreal(_time.toTime_t());
         for (int j=0; j<numdataseries; j++)
         {   for (int i = 0; i<results.size(); i++)
             {   QString str = results[i].trimmed();
                 qDebug()<<str;
-                QDateTime _time = QDateTime::currentDateTime();
+
                 if (str.contains(dataseriesinfo[j].ArduinoKeyword))
                 {
                     double value = str.right(str.size()-QString(dataseriesinfo[j].ArduinoKeyword + "= ").size()).trimmed().toFloat();
                     Values[j]->setText(QString::number(value));
-                    qreal t = qreal(_time.toMSecsSinceEpoch()/86400000.0);
                     dataseriesinfo[j].max_val = std::max(value,dataseriesinfo[j].max_val);
                     QCPGraphData datapoint;
                     datapoint.key = _time.toTime_t();
                     datapoint.value = value;
                     plots[j]->graph(0)->addData(datapoint.key,datapoint.value);
+                    plots[j]->yAxis->setRange(0, dataseriesinfo[j].max_val*1.1);
                     added ++;
                     QString sql = "INSERT INTO `BioRetentionData`.`SensorData` (`Time`, `Value`, `Sensor`) VALUES ('" + _time.toString("yyyy/MM/dd hh:mm:ss") + "', '" + QString::number(value) + "', '" + dataseriesinfo[j].ArduinoKeyword +"')";
                     qry.prepare(sql);
@@ -310,22 +316,23 @@ void MainWindow::update()
                     }
                     else
                         qDebug()<<"Transaction Successful!";
-
-                    plots[j]->yAxis->setRange(0, dataseriesinfo[j].max_val*1.1);
-                    if (t>_max)
-                    {   _max = qreal(QDateTime::currentDateTime().toTime_t()+1800);
-                        _min = qreal(QDateTime::currentDateTime().toTime_t()-1800);
-                        plots[j]->xAxis->setRange(_min, _max);
-                        plots[j]->graph(0)->data()->remove(0,plots[j]->graph(0)->data()->size()-added);
-                        added = 0;
-                    }
-
-
                     qDebug()<<QDateTime::currentDateTime().toMSecsSinceEpoch()/86400000.00;
                 }
 
                 ui->lblTime->setText(_time.toString("yyyy.MM.dd, hh:mm:ss"));
             }
+        }
+
+
+        if (t1>_max)
+        {   _max = qreal(QDateTime::currentDateTime().toTime_t()+update_graph_interval/2);
+            _min = qreal(QDateTime::currentDateTime().toTime_t()-update_graph_interval/2);
+            for (int j=0; j<numdataseries; j++)
+            {   plots[j]->xAxis->setRange(_min, _max);
+                plots[j]->graph(0)->data()->remove(0,added_p);
+            }
+            added_p = added;
+            added = 0;
         }
 
         QCoreApplication::processEvents();

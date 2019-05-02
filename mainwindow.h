@@ -44,12 +44,13 @@ private:
     QVector<QHBoxLayout*> horizontalLayouts;
     QVector<QLabel*> Labels;
     QVector<QLabel*> Values;
-
+    double update_graph_interval = 3600;
 
 private slots:
     void on_recieve_data_clicked();
     void update();
 
 };
+
 
 #endif // MAINWINDOW_H
