@@ -48,6 +48,7 @@ private:
 
 private slots:
     void on_recieve_data_clicked();
+    void on_show_historic_data_clicked();
     void update();
 
 };

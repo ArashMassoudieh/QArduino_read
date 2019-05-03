@@ -15,7 +15,7 @@
 #include <QMetaEnum>
 #include <math.h>
 #include <algorithm>
-
+#include "showhistoricdata.h"
 // OS Specific sleep
 #ifdef _WIN32
 #include <windows.h>
@@ -183,6 +183,7 @@ MainWindow::MainWindow(QWidget *parent) :
 
     ui->setupUi(this);
     connect(ui->pushButton,SIGNAL(clicked()),this,SLOT(on_recieve_data_clicked()));
+    connect(ui->ShowHistoricData,SIGNAL(clicked()),this,SLOT(on_show_historic_data_clicked()));
     timer = new QTimer(this);
     connect(timer, SIGNAL(timeout()), this, SLOT(update()));
     timer->start(10000);
@@ -433,4 +434,11 @@ void MainWindow::setupplot(QCustomPlot *customPlot)
       plots[i]->legend->setVisible(true);
       plots[i]->legend->setBrush(QColor(255, 255, 255, 150));
   }
+}
+
+
+void MainWindow::on_show_historic_data_clicked()
+{
+    ShowHistoricData *historicdata_window = new ShowHistoricData();
+    historicdata_window->show();
 }

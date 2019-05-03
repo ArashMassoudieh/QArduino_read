@@ -33,15 +33,18 @@ SOURCES += \
     Serial/src/impl/unix.cc \
     Serial/src/impl/list_ports/list_ports_linux.cc \
     connectmysql.cpp \
-    qcustomplot/qcustomplot.cpp
+    qcustomplot/qcustomplot.cpp \
+    showhistoricdata.cpp
 
 HEADERS += \
         mainwindow.h \
     connectmysql.h \
-    qcustomplot/qcustomplot.h
+    qcustomplot/qcustomplot.h \
+    showhistoricdata.h
 
 FORMS += \
-        mainwindow.ui
+        mainwindow.ui \
+    showhistoricdata.ui
 
 # Default rules for deployment.
 qnx: target.path = /tmp/$${TARGET}/bin
